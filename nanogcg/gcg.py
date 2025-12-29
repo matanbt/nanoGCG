@@ -14,6 +14,12 @@ from torch import Tensor
 from transformers import set_seed
 from scipy.stats import spearmanr
 
+try:
+    import wandb
+    WANDB_AVAILABLE = True
+except ImportError:
+    WANDB_AVAILABLE = False
+
 from nanogcg.utils import (
     INIT_CHARS,
     configure_pad_token,
@@ -61,6 +67,7 @@ class GCGConfig:
     seed: int = None
     verbosity: str = "INFO"
     probe_sampling_config: Optional[ProbeSamplingConfig] = None
+    wandb_log: bool = False
 
 
 @dataclass
@@ -234,6 +241,10 @@ class GCG:
         tokenizer = self.tokenizer
         config = self.config
 
+        if config.wandb_log and not WANDB_AVAILABLE:
+            logger.warning("wandb logging is enabled but wandb is not installed. Install it with: pip install wandb")
+            config.wandb_log = False
+
         if config.seed is not None:
             set_seed(config.seed)
             torch.use_deterministic_algorithms(True, warn_only=True)
@@ -366,6 +377,13 @@ class GCG:
 
             buffer.log_buffer(tokenizer)
 
+            # Log to wandb if enabled
+            if config.wandb_log:
+                wandb.log({
+                    "loss": buffer.get_lowest_loss(),
+                    "step": len(losses)
+                })
+
             if self.stop_flag:
                 logger.info("Early stopping due to finding a perfect match.")
                 break
@@ -378,6 +396,13 @@ class GCG:
             losses=losses,
             strings=optim_strings,
         )
+
+        # Log final results to wandb if enabled
+        if config.wandb_log:
+            wandb.log({
+                "final_trigger_loss": result.best_loss,
+                "final_trigger_string": result.best_string
+            })
 
         return result
 
