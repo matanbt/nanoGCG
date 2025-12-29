@@ -378,7 +378,7 @@ class GCG:
             buffer.log_buffer(tokenizer)
 
             # Log to wandb if enabled
-            if config.wandb_log:
+            if config.wandb_log and WANDB_AVAILABLE:
                 wandb.log({
                     "loss": buffer.get_lowest_loss(),
                     "step": len(losses)
@@ -398,7 +398,7 @@ class GCG:
         )
 
         # Log final results to wandb if enabled
-        if config.wandb_log:
+        if config.wandb_log and WANDB_AVAILABLE:
             wandb.log({
                 "final_trigger_loss": result.best_loss,
                 "final_trigger_string": result.best_string
