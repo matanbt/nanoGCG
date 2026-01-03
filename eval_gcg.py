@@ -75,10 +75,7 @@ def nanogcg(
             search_width=512,
             topk=256,
             n_replace=1,
-<<<<<<< HEAD
-=======
             use_prefix_cache=False,
->>>>>>> 2d8697e (Add comprison script)
             wandb_log=True
         )
         
