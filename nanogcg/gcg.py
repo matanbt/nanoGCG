@@ -400,8 +400,8 @@ class GCG:
         # Log final results to wandb if enabled
         if config.wandb_log and WANDB_AVAILABLE:
             wandb.log({
-                "final_trigger_loss": result.best_loss,
-                "final_trigger_string": result.best_string
+                "best_loss": result.best_loss,
+                "best_trigger_str": result.best_string
             })
 
         return result
