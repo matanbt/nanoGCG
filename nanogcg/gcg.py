@@ -236,14 +236,19 @@ class GCG:
         self,
         messages: Union[str, List[dict]],
         target: str,
+        wandb_metadata: dict,
     ) -> GCGResult:
         model = self.model
         tokenizer = self.tokenizer
         config = self.config
 
-        if config.wandb_log and not WANDB_AVAILABLE:
-            logger.warning("wandb logging is enabled but wandb is not installed. Install it with: pip install wandb")
-            config.wandb_log = False
+        if config.wandb_log:
+            wandb.init(
+                name=wandb_metadata.get('name', "nanogcg"),
+                tags=['nanogcg'],
+                project_name="gcg_eval", entity="matanbt",
+                config={"messages": messages, "target": target, **wandb_metadata},
+            )
 
         if config.seed is not None:
             set_seed(config.seed)
