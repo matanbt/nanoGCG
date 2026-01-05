@@ -35,6 +35,7 @@ def nanogcg(
         DEFAULT_INDICES, 
         help="Specific indices to run. Usage: --sample-indices 225 --sample-indices 89"
     ),
+    seed: int = typer.Option(RANDOM_SEED, help="Random seed for reproducibility"),
 ):
     device = "cuda" if torch.cuda.is_available() else "cpu"
     
@@ -46,6 +47,7 @@ def nanogcg(
     print(f"Loading model {model_name} on {device}...")
     model = AutoModelForCausalLM.from_pretrained(
         model_name,
+        dtype='bfloat16',
     ).to(device)
     tokenizer = AutoTokenizer.from_pretrained(model_name)
     print(f"Loaded model {model_name} with dtype {model.dtype}.")
@@ -59,18 +61,22 @@ def nanogcg(
         # Load data safely accessing the scalar values
         messages = row['message_template'].replace('{{OPTIMIZED_TRIGGER}}', '{optim_str}')
         target = row['target_response_prefix']
+        run_name = f'nanogcg[{model_name.split("/")[-1]},m={message_id}]'
+        if seed != RANDOM_SEED:
+            run_name += f'_s={seed}'
         wandb_metadata = dict(
             optimized_message_id=message_id,
-            name=f'nanogcg[{model_name.split("/")[-1]},m={message_id}]',
+            name=run_name,
             model_name=model_name,
             implementation='nanogcg',
             method='gcg',
+            random_seed=seed,
         )
 
         # Set GCG parameters
         config = GCGConfig(
             optim_str_init=INITIAL_TRIGGER,
-            seed=RANDOM_SEED,
+            seed=seed,
             num_steps=500,
             search_width=512,
             topk=256,
@@ -92,7 +98,8 @@ def nanogcg(
         gcg = GCG(model, tokenizer, config)
         result = gcg.run(messages, target, wandb_metadata)
 
-        print(result)
+        wandb.finish()
+
 
 @app.command()
 def tropt(
@@ -101,6 +108,7 @@ def tropt(
         DEFAULT_INDICES, 
         help="Specific indices to run. Usage: --sample-indices 225 --sample-indices 89"
     ),
+    seed: int = typer.Option(RANDOM_SEED, help="Random seed for reproducibility"),
 ):
     device = "cuda" if torch.cuda.is_available() else "cpu"
     
@@ -114,6 +122,7 @@ def tropt(
         device=device,
         forward_pass_batch_size=1024,
         use_prefix_cache=False,
+        dtype='bfloat16',
     )
     loss = PrefillCELoss()
 
@@ -127,12 +136,16 @@ def tropt(
         # Load data safely accessing the scalar values
         messages = row['message_template']
         target = row['target_response_prefix']
+        run_name = f'tropt[{model_name.split("/")[-1]},m={message_id}]'
+        if seed != RANDOM_SEED:
+            run_name += f'_s={seed}'
         wandb_metadata = dict(
             optimized_message_id=message_id,
-            name=f'tropt[{model_name.split("/")[-1]},m={message_id}]',
+            name=run_name,
             model_name=model_name,
             implementation='tropt',
             method='gcg',
+            random_seed=seed,
         )
 
         # Run GCG
@@ -146,7 +159,7 @@ def tropt(
         optimizer = GCGOptimizer(
             model=model,
             loss=loss,
-            seed=RANDOM_SEED,
+            seed=seed,
             tracker=tracker,
             # Set parameters from the paper:
             num_steps=500,
@@ -166,7 +179,6 @@ def tropt(
         )
         tracker.finish()
 
-        print(result)
     
 @app.command()
 def eval_results(
